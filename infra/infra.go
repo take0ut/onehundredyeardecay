@@ -5,6 +5,7 @@ import (
 
 	"github.com/aws/aws-cdk-go/awscdk/v2"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awsdynamodb"
+	"github.com/aws/aws-cdk-go/awscdk/v2/awsecs"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awsevents"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awseventstargets"
 	"github.com/aws/aws-cdk-go/awscdklambdagoalpha/v2"
@@ -16,33 +17,14 @@ type InfraStackProps struct {
 	awscdk.StackProps
 }
 
+type ApiConstructProps struct{}
+
 func NewInfraStack(scope constructs.Construct, id string, props *InfraStackProps) awscdk.Stack {
 	var sprops awscdk.StackProps
 	if props != nil {
 		sprops = props.StackProps
 	}
 	stack := awscdk.NewStack(scope, &id, &sprops)
-
-	// The code that defines your stack goes here
-
-	// example resource
-	// queue := awssqs.NewQueue(stack, jsii.String("InfraQueue"), &awssqs.QueueProps{
-	// 	VisibilityTimeout: awscdk.Duration_Seconds(jsii.Number(300)),
-	// })
-
-	return stack
-}
-
-func main() {
-	defer jsii.Close()
-
-	app := awscdk.NewApp(nil)
-
-	stack := NewInfraStack(app, "InfraStack", &InfraStackProps{
-		awscdk.StackProps{
-			Env: env(),
-		},
-	})
 
 	table := awsdynamodb.NewTable(stack, jsii.String("Table"), &awsdynamodb.TableProps{
 		PartitionKey: &awsdynamodb.Attribute{
@@ -69,6 +51,44 @@ func main() {
 	})
 
 	rule.AddTarget(awseventstargets.NewLambdaFunction(lambda, nil))
+
+	NewApi(stack, "Api")
+
+	return stack
+}
+
+func NewApi(scope constructs.Construct, id string) {
+	taskDef := awsecs.NewTaskDefinition(scope, jsii.String("TaskDefinition"), &awsecs.TaskDefinitionProps{
+		Compatibility: awsecs.Compatibility_FARGATE,
+		Cpu:           jsii.String("256"),
+		MemoryMiB:     jsii.String("512"),
+	})
+
+	taskDef.AddContainer(jsii.String("Container"), &awsecs.ContainerDefinitionOptions{
+		Image: awsecs.ContainerImage_FromAsset(jsii.String("../"), &awsecs.AssetImageProps{
+			AssetName: jsii.String("api"),
+		}),
+	})
+
+	cluster := awsecs.NewCluster(scope, jsii.String("Cluster"), &awsecs.ClusterProps{})
+
+	awsecs.NewFargateService(scope, jsii.String("Service"), &awsecs.FargateServiceProps{
+		Cluster:        cluster,
+		TaskDefinition: taskDef,
+		ServiceName:    jsii.String("api"),
+	})
+}
+
+func main() {
+	defer jsii.Close()
+
+	app := awscdk.NewApp(nil)
+
+	NewInfraStack(app, "InfraStack", &InfraStackProps{
+		awscdk.StackProps{
+			Env: env(),
+		},
+	})
 
 	app.Synth(nil)
 }

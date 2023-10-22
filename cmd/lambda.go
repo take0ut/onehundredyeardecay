@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 	"log"
-	"net/http"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -12,7 +12,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
-	"github.com/gin-gonic/gin"
 )
 
 type Values struct {
@@ -22,34 +21,7 @@ type Values struct {
 	LastUpdated time.Time `dynamodbav:"lastUpdated"`
 }
 
-func setupRouter() *gin.Engine {
-	r := gin.Default()
-	r.LoadHTMLGlob("cmd/server/dist/index.html")
-	r.GET("/ping", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"message": "pong",
-		})
-	})
-
-	r.GET("/decay", func(c *gin.Context) {
-		c.Header("Access-Control-Allow-Origin", "*")
-		value := getDecayValue()
-		c.JSON(http.StatusOK, gin.H{"value": value})
-	})
-
-	r.GET("/", func(c *gin.Context) {
-		c.HTML((http.StatusOK), "index.html", nil)
-	})
-	return r
-}
-
 func main() {
-	router := setupRouter()
-	router.Static("/assets", "./cmd/server/dist/assets")
-	router.Run(":8000")
-}
-
-func getDecayValue() (value string) {
 	// TODO is an empty context which hasn't been evaluated yet.
 	cfg, err := config.LoadDefaultConfig(context.TODO())
 
@@ -88,5 +60,38 @@ func getDecayValue() (value string) {
 		log.Fatal(err)
 	}
 
-	return values.Value
+	values.UpdateCount++
+
+	values.LastUpdated = time.Now()
+
+	valueAsFloat, err := strconv.ParseFloat(values.Value, 64)
+	log.Printf("Found values: %+v", values)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if valueAsFloat == 0 {
+		log.Fatal("It has decayed.")
+	} else {
+		valueAsFloat -= 0.000001
+	}
+
+	values.Value = strconv.FormatFloat(valueAsFloat, 'f', -1, 64)
+
+	item, err := attributevalue.MarshalMap(values)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	client.PutItem(context.TODO(), &dynamodb.PutItemInput{
+		TableName: &tableName,
+		Item:      item,
+	})
+
+	log.Printf("Updated values: %+v", values)
+
+	os.Exit(0)
+
 }
