@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -88,5 +89,10 @@ func getDecayValue() (value string) {
 		log.Fatal(err)
 	}
 
+	valueAsFloat, err := strconv.ParseFloat(values.Value, 64)
+
+	if valueAsFloat < 1 || err != nil {
+		return "0"
+	}
 	return values.Value
 }

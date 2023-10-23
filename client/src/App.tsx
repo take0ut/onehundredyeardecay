@@ -11,7 +11,7 @@ function App() {
       return
     }
     const fetchData = async () => {
-      const response = await fetch('http://localhost:8000/decay')
+      const response = await fetch('https://decay.oren.cool')
       const data = await response.json()
       return data
     }
@@ -49,7 +49,7 @@ function App() {
       <h1>
         It will decay over time.
       </h1>
-      <p> In one hundred years, it will be gone.</p>
+      <p> In one year, it will be gone.</p>
 
       </div>
 

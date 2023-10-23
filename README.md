@@ -1,8 +1,8 @@
-# One Hundred Year Decay
+# Year of Decay
 
-One Hundred Year Decay is a project done for Week 4 of The Musical Web, a class at the School for Poetic Computation taught by Chloe Alexandra Thompson & Tommy Martinez.
+Year of Decay is a project done for Week 4 of The Musical Web, a class at the School for Poetic Computation taught by Chloe Alexandra Thompson & Tommy Martinez.
 
-One Hundred Year Decay is heavily inspired by William Basinki's Disintegration Loops, and is an attempt to recreate them on a much more glacial time scale.
+Year of Decay is heavily inspired by William Basinki's Disintegration Loops, and is an attempt to recreate them on a much more glacial time scale.
 
 A single key/value pair is decremented outside of the browser, and when you listen to the decay, this value is retrieved and used to configure various settings for effects in Tone.JS.
 

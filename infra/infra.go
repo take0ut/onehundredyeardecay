@@ -6,6 +6,7 @@ import (
 	"github.com/aws/aws-cdk-go/awscdk/v2"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awsdynamodb"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awsecs"
+	"github.com/aws/aws-cdk-go/awscdk/v2/awselasticloadbalancingv2"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awsevents"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awseventstargets"
 	"github.com/aws/aws-cdk-go/awscdklambdagoalpha/v2"
@@ -47,17 +48,17 @@ func NewInfraStack(scope constructs.Construct, id string, props *InfraStackProps
 	table.GrantReadWriteData(lambda)
 
 	rule := awsevents.NewRule(stack, jsii.String("ScheduleRule"), &awsevents.RuleProps{
-		Schedule: awsevents.Schedule_Rate(awscdk.Duration_Minutes(jsii.Number(1000000))),
+		Schedule: awsevents.Schedule_Rate(awscdk.Duration_Minutes(jsii.Number(1))),
 	})
 
 	rule.AddTarget(awseventstargets.NewLambdaFunction(lambda, nil))
 
-	NewApi(stack, "Api")
+	NewApi(stack, "Api", table)
 
 	return stack
 }
 
-func NewApi(scope constructs.Construct, id string) {
+func NewApi(scope constructs.Construct, id string, table awsdynamodb.Table) {
 	taskDef := awsecs.NewTaskDefinition(scope, jsii.String("TaskDefinition"), &awsecs.TaskDefinitionProps{
 		Compatibility: awsecs.Compatibility_FARGATE,
 		Cpu:           jsii.String("256"),
@@ -68,15 +69,53 @@ func NewApi(scope constructs.Construct, id string) {
 		Image: awsecs.ContainerImage_FromAsset(jsii.String("../"), &awsecs.AssetImageProps{
 			AssetName: jsii.String("api"),
 		}),
+		PortMappings: &[]*awsecs.PortMapping{
+			{
+				ContainerPort: jsii.Number(8000),
+				HostPort:      jsii.Number(8000),
+			},
+		},
+		Environment: &map[string]*string{
+			"TABLE_NAME": table.TableName(),
+		},
+		Logging: awsecs.LogDriver_AwsLogs(&awsecs.AwsLogDriverProps{
+			StreamPrefix: jsii.String("api"),
+		}),
 	})
 
 	cluster := awsecs.NewCluster(scope, jsii.String("Cluster"), &awsecs.ClusterProps{})
 
-	awsecs.NewFargateService(scope, jsii.String("Service"), &awsecs.FargateServiceProps{
+	service := awsecs.NewFargateService(scope, jsii.String("Service"), &awsecs.FargateServiceProps{
 		Cluster:        cluster,
 		TaskDefinition: taskDef,
 		ServiceName:    jsii.String("api"),
 	})
+
+	table.GrantReadWriteData(service.TaskDefinition().TaskRole())
+
+	alb := awselasticloadbalancingv2.NewApplicationLoadBalancer(scope, jsii.String("LoadBalancer"), &awselasticloadbalancingv2.ApplicationLoadBalancerProps{
+		InternetFacing:   jsii.Bool(true),
+		LoadBalancerName: jsii.String("api"),
+		Vpc:              cluster.Vpc(),
+	})
+
+	listener := alb.AddListener(jsii.String("Listener"), &awselasticloadbalancingv2.BaseApplicationListenerProps{
+		Port: jsii.Number(80),
+		Open: jsii.Bool(true),
+	})
+
+	listener.AddTargets(jsii.String("Target"), &awselasticloadbalancingv2.AddApplicationTargetsProps{
+		Port: jsii.Number(8000),
+		Targets: &[]awselasticloadbalancingv2.IApplicationLoadBalancerTarget{
+			service,
+		},
+		HealthCheck: &awselasticloadbalancingv2.HealthCheck{
+			Interval: awscdk.Duration_Seconds(jsii.Number(60)),
+			Path:     jsii.String("/ping"),
+			Timeout:  awscdk.Duration_Seconds(jsii.Number(5)),
+		},
+	})
+
 }
 
 func main() {
@@ -84,7 +123,7 @@ func main() {
 
 	app := awscdk.NewApp(nil)
 
-	NewInfraStack(app, "InfraStack", &InfraStackProps{
+	NewInfraStack(app, "YearOfDecay2", &InfraStackProps{
 		awscdk.StackProps{
 			Env: env(),
 		},

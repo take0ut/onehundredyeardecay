@@ -71,10 +71,10 @@ func main() {
 		log.Fatal(err)
 	}
 
-	if valueAsFloat == 0 {
+	if valueAsFloat < 0 {
 		log.Fatal("It has decayed.")
 	} else {
-		valueAsFloat -= 0.000001
+		valueAsFloat -= 0.00000190259
 	}
 
 	values.Value = strconv.FormatFloat(valueAsFloat, 'f', -1, 64)

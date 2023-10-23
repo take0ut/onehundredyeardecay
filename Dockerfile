@@ -1,4 +1,4 @@
-FROM golang:alpine
+FROM --platform=linux/amd64 golang:alpine
 
 RUN apk add nodejs npm
 
@@ -11,10 +11,10 @@ RUN go mod download
 
 COPY client ./client
 
-COPY cmd/server ./cmd
+COPY cmd/server ./cmd/server
 
-RUN ls cmd
+RUN cd client && npm install && npm run build-docker
 
-RUN cd client && npm install && npm run build
+RUN cp -r client/dist ./cmd/server
 
-CMD cd .. && go run cmd/main.go
+CMD cd /app/src && go run cmd/server/main.go
